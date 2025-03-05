@@ -4,8 +4,8 @@ import (
 	"fmt"
 )
 
-// ApplicationCommandHelp 默认指令
-func (c *CDQ) ApplicationCommandHelp() {
+// applicationCommandHelp 默认指令
+func (c *CDQ) applicationCommandHelp() {
 	c.ApplicationCommand(&Command{
 		Name:        "help",
 		AliasList:   []string{"help", "h"},

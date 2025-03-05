@@ -17,7 +17,8 @@ type CommandOption struct {
 
 // CommandRun 指令执行接口
 type CommandRun interface {
-	Run()
 	New(c *CDQ)
+	Run()
+	Exit()
 	GenCommandOption(str string, command *Command) map[string]*CommandOption // 生成附加参数
 }

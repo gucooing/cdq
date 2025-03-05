@@ -1,7 +1,7 @@
 package cdq
 
 import (
-	"gucooing/cdq/logger"
+	"github.com/gucooing/cdq/logger"
 )
 
 type CDQ struct {
@@ -35,7 +35,7 @@ func New(c *CDQ, commandList ...CommandRun) *CDQ {
 		go cmd.Run()
 	}
 	// 注册默认命令
-	c.ApplicationCommandHelp()
+	c.applicationCommandHelp()
 
 	return c
 }

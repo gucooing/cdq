@@ -8,22 +8,47 @@ import (
 )
 
 type shell struct {
-	c *CDQ
+	c    *CDQ
+	done chan bool
 }
 
 func (c *CDQ) newShell() *shell {
-	s := &shell{c: c}
+	s := &shell{
+		done: make(chan bool, 1),
+	}
+	s.New(c)
 	go s.Run()
 	return s
 }
 
 func (s *shell) New(c *CDQ) {
 	s.c = c
+
+	c.ApplicationCommand(
+		&Command{
+			Name:        "exit",
+			AliasList:   []string{"exit"},
+			Description: "shell 内置指令,退出shell程序",
+			Options:     nil,
+			CommandFunc: func(options map[string]*CommandOption) string {
+				s.Exit()
+				return "exit"
+			},
+		})
+}
+
+func (s *shell) Exit() {
+	s.done <- true
 }
 
 func (s *shell) Run() {
 	reader := bufio.NewReader(os.Stdin)
 	for {
+		select {
+		case <-s.done:
+			return
+		default:
+		}
 		fmt.Print("> ")
 		input, err := reader.ReadString('\n')
 		if err != nil {
