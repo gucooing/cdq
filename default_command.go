@@ -11,8 +11,8 @@ func (c *CDQ) applicationCommandHelp() {
 		AliasList:   []string{"help", "h"},
 		Description: "有关某个命令的详细信息，请键入 help 命令名",
 		CommandFunc: c.help,
-		Options: map[string]*CommandOption{
-			"c": {
+		Options: []*CommandOption{
+			{
 				Name:        "c",
 				Description: "显示该命令的帮助信息。",
 				Required:    false,
@@ -47,7 +47,7 @@ func (c *CDQ) help(options map[string]*CommandOption) string {
 				if !option.Required {
 					example += fmt.Sprintf(" [%s:msg]", option.Name)
 				} else {
-					example += fmt.Sprintf(" <%s:msg>", option.Name)
+					example += fmt.Sprintf(" %s", option.Name)
 				}
 				opt += fmt.Sprintf("      %s - %s\n", option.Name, option.Description)
 			}

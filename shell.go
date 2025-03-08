@@ -2,6 +2,7 @@ package cdq
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -23,7 +24,7 @@ func (c *CDQ) newShell() *shell {
 
 func (s *shell) New(c *CDQ) {
 	s.c = c
-
+	c.Log.Debug("启用Shell指令")
 	c.ApplicationCommand(
 		&Command{
 			Name:        "exit",
@@ -65,44 +66,44 @@ func (s *shell) Run() {
 			continue
 		}
 		// 附加参数解析
-		options := s.GenCommandOption(input, command)
+		options, err := s.GenCommandOption(input, command)
+		if err != nil {
+			s.c.Log.Error(err.Error())
+			continue
+		}
 		s.c.Log.Info("执行指令:%s,\n%s", command.Name, command.CommandFunc(options))
 	}
 }
 
-func (s *shell) GenCommandOption(input string, command *Command) map[string]*CommandOption {
+func (s *shell) GenCommandOption(input string, command *Command) (map[string]*CommandOption, error) {
 	options := make(map[string]*CommandOption, 0)
 	parts := strings.Fields(input)
-	if len(parts) == 0 {
-		return options
-	}
-	// 建立索引
-	partMap := make(map[string]string)
-	for index := 0; index < len(parts); index++ {
-		part := parts[index]
-		ids := strings.Split(part, ":")
-		if len(ids) != 2 {
-			continue
+	for index, op := range command.Options {
+		if op.Required && len(parts) < index+2 {
+			return nil, errors.New(fmt.Sprintf("缺少必要参数:%s", op.Name))
 		}
-		if _, ok := partMap[ids[0]]; ok {
-			s.c.Log.Debug("重复的附加参数:%s", part)
-			continue
-		}
-		partMap[ids[0]] = ids[1]
-	}
-	for _, op := range command.Options {
-		part, ok := partMap[op.Name]
-		if !ok {
-			if op.Required {
-				s.c.Log.Error("缺失必要的附加参数:%s", op.Name)
+		if op.Required {
+			if len(parts) < index+2 {
+				return nil, errors.New(fmt.Sprintf("缺少必要参数:%s", op.Name))
 			}
-			continue
-		}
-		options[op.Name] = &CommandOption{
-			Name:   op.Name,
-			Option: part,
+			options[op.Name] = &CommandOption{
+				Name:   op.Name,
+				Option: parts[index+1],
+			}
+		} else {
+			if len(parts) < index+2 {
+				continue
+			}
+			ids := strings.Split(parts[index+1], ":")
+			if len(ids) != 2 {
+				continue
+			}
+			options[ids[0]] = &CommandOption{
+				Name:   ids[0],
+				Option: ids[1],
+			}
 		}
 	}
 
-	return options
+	return options, nil
 }
