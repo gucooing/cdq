@@ -22,7 +22,7 @@ func (c *CDQ) applicationCommandHelp() {
 	})
 }
 
-func (c *CDQ) help(options map[string]*CommandOption) string {
+func (c *CDQ) help(options map[string]*CommandOption) (string, error) {
 	command := options["c"]
 	var returnstr string
 	if command == nil {
@@ -57,5 +57,5 @@ func (c *CDQ) help(options map[string]*CommandOption) string {
 		}
 	}
 
-	return returnstr
+	return returnstr, nil
 }

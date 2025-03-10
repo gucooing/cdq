@@ -25,9 +25,9 @@ func NewShell(c *CDQ) *Shell {
 			AliasList:   []string{"exit"},
 			Description: "shell 内置指令,退出shell程序",
 			Options:     nil,
-			CommandFunc: func(options map[string]*CommandOption) string {
+			CommandFunc: func(options map[string]*CommandOption) (string, error) {
 				s.Exit()
-				return "exit"
+				return "exit", nil
 			},
 		})
 	return s
@@ -66,7 +66,12 @@ func (s *Shell) Run() {
 			s.c.Log.Error(err.Error())
 			continue
 		}
-		s.c.Log.Info("执行指令:%s,\n%s", command.Name, command.CommandFunc(options))
+		msg, err := command.CommandFunc(options)
+		if err != nil {
+			s.c.Log.Error("执行指令:%s 失败,错误%s", command.Name, err.Error())
+			continue
+		}
+		s.c.Log.Info("执行指令:%s 成功,%s", command.Name, msg)
 	}
 }
 

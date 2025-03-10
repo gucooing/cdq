@@ -11,6 +11,7 @@ import (
 type GinApi struct {
 	c      *CDQ
 	Router *gin.Engine
+	ApiKey string
 	server *http.Server
 }
 
@@ -29,13 +30,18 @@ func (a *GinApi) NewRouter(addr string, debug bool) {
 	} else {
 		a.Router = gin.New()
 	}
-	a.Router.GET("/cdq/api", a.GetApi)
+	a.Router.GET("/cdq/api", a.AutoGucooingApi, a.GetApi)
 	a.Router.Use(gin.Recovery())
 	a.server = &http.Server{Addr: addr, Handler: a.Router}
 }
 
 func (a *GinApi) SetRouter(router *gin.Engine) {
 	a.Router = router
+	a.Router.GET("/cdq/api", a.AutoGucooingApi, a.GetApi)
+}
+
+func (a *GinApi) SetApiKey(key string) {
+	a.ApiKey = key
 }
 
 func (a *GinApi) Run() {
@@ -90,7 +96,13 @@ func (a *GinApi) GetApi(c *gin.Context) {
 		resp.Msg = err.Error()
 		return
 	}
-	resp.Msg = fmt.Sprintf("执行指令:%s,\n%s", command.Name, command.CommandFunc(options))
+	msg, err := command.CommandFunc(options)
+	if err != nil {
+		resp.Code = GinApiCodeErr
+		resp.Msg = err.Error()
+		return
+	}
+	resp.Msg = fmt.Sprintf("%s", msg)
 }
 
 func (a *GinApi) GenCommandOption(input any, command *Command) (map[string]*CommandOption, error) {
@@ -114,4 +126,14 @@ func (a *GinApi) GenCommandOption(input any, command *Command) (map[string]*Comm
 	}
 
 	return options, nil
+}
+
+func (a *GinApi) AutoGucooingApi(c *gin.Context) {
+	if a.ApiKey == "" ||
+		c.GetHeader("Authorization") == a.ApiKey {
+		return
+	} else {
+		c.String(401, "Unauthorized")
+		c.Abort()
+	}
 }
