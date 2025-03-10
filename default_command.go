@@ -10,6 +10,7 @@ func (c *CDQ) applicationCommandHelp() {
 		Name:        "help",
 		AliasList:   []string{"help", "h"},
 		Description: "有关某个命令的详细信息，请键入 help 命令名",
+		Permissions: Guest,
 		CommandFunc: c.help,
 		Options: []*CommandOption{
 			{

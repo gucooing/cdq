@@ -8,22 +8,16 @@ import (
 	"strings"
 )
 
-type shell struct {
+type Shell struct {
 	c    *CDQ
 	done chan bool
 }
 
-func (c *CDQ) newShell() *shell {
-	s := &shell{
-		done: make(chan bool, 1),
+func NewShell(c *CDQ) *Shell {
+	s := &Shell{
+		c:    c,
+		done: make(chan bool),
 	}
-	s.New(c)
-	go s.Run()
-	return s
-}
-
-func (s *shell) New(c *CDQ) {
-	s.c = c
 	c.Log.Debug("启用Shell指令")
 	c.ApplicationCommand(
 		&Command{
@@ -36,13 +30,14 @@ func (s *shell) New(c *CDQ) {
 				return "exit"
 			},
 		})
+	return s
 }
 
-func (s *shell) Exit() {
+func (s *Shell) Exit() {
 	s.done <- true
 }
 
-func (s *shell) Run() {
+func (s *Shell) Run() {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		select {
@@ -75,9 +70,9 @@ func (s *shell) Run() {
 	}
 }
 
-func (s *shell) GenCommandOption(input string, command *Command) (map[string]*CommandOption, error) {
+func (s *Shell) GenCommandOption(input any, command *Command) (map[string]*CommandOption, error) {
 	options := make(map[string]*CommandOption, 0)
-	parts := strings.Fields(input)
+	parts := strings.Fields(input.(string))
 	for index, op := range command.Options {
 		if op.Required && len(parts) < index+2 {
 			return nil, errors.New(fmt.Sprintf("缺少必要参数:%s", op.Name))

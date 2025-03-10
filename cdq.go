@@ -5,7 +5,6 @@ import (
 )
 
 type CDQ struct {
-	Shell          bool                // 是否启用内置的shell执行器
 	Log            logger.Logger       // log
 	commandList    []*Command          // 注册的指令
 	commandRunList []CommandRun        // 注册的指令器
@@ -13,31 +12,28 @@ type CDQ struct {
 }
 
 // New c: cdq实例,commandList:注册的外置执行器
-func New(c *CDQ, commandList ...CommandRun) *CDQ {
+func New(c *CDQ) *CDQ {
 	if c == nil {
 		c = new(CDQ)
 	}
 	if c.Log == nil {
 		c.Log = logger.NewLog(logger.LevelDebug, nil)
 	}
-	if c.commandRunList == nil {
-		c.commandRunList = make([]CommandRun, 0)
-	}
 
-	if c.Shell { // 是否启用内置的Shell
-		s := c.newShell()
-		c.commandRunList = append(c.commandRunList, s)
-	}
-
-	for _, cmd := range commandList { // 启动外置的执行器
-		cmd.New(c)
-		c.commandRunList = append(c.commandRunList, cmd)
-		go cmd.Run()
-	}
 	// 注册默认命令
 	c.applicationCommandHelp()
 
 	return c
+}
+
+func (c *CDQ) AddCommandRun(commandList ...CommandRun) {
+	if c.commandRunList == nil {
+		c.commandRunList = make([]CommandRun, 0)
+	}
+	for _, cmd := range commandList { // 启动外置的执行器
+		c.commandRunList = append(c.commandRunList, cmd)
+		go cmd.Run()
+	}
 }
 
 func (c *CDQ) ApplicationCommand(command *Command) {
