@@ -4,21 +4,28 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 )
 
 type GinApi struct {
-	c      *CDQ
-	Router *gin.Engine
-	ApiKey string
-	server *http.Server
+	c       *CDQ
+	Router  *gin.Engine
+	ApiKey  string
+	server  *http.Server
+	ginSync *sync.Mutex
 }
 
-func NewGinApi(c *CDQ) *GinApi {
+func NewGinApi(c *CDQ, ginSync *sync.Mutex) *GinApi {
 	a := &GinApi{
-		c: c,
+		c:       c,
+		ginSync: ginSync,
 	}
+	if a.ginSync == nil {
+		a.ginSync = &sync.Mutex{}
+	}
+
 	c.Log.Debug("启用GinApi指令")
 	return a
 }
@@ -77,6 +84,8 @@ const (
 )
 
 func (a *GinApi) GetApi(c *gin.Context) {
+	a.ginSync.Lock()
+	defer a.ginSync.Unlock()
 	resp := &GinApiResponse{
 		Code: GinApiCodeOk,
 		Msg:  "",
