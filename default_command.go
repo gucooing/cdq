@@ -22,10 +22,9 @@ func (c *CDQ) applicationCommandHelp() {
 	})
 }
 
-func (c *CDQ) help(options map[string]*CommandOption) (string, error) {
-	command := options["c"]
+func (c *CDQ) help(options map[string]string) (string, error) {
 	var returnstr string
-	if command == nil {
+	if options["c"] == "" {
 		returnstr += "有关某个命令的详细信息，请键入 help c:命令名\n"
 		for _, comm := range c.commandList {
 			returnstr += fmt.Sprintf(
@@ -36,7 +35,7 @@ func (c *CDQ) help(options map[string]*CommandOption) (string, error) {
 			)
 		}
 	} else {
-		comm, ok := c.commandMap[command.Option]
+		comm, ok := c.commandMap[options["c"]]
 		if !ok {
 			returnstr += "不支持此命令\n"
 		} else {
