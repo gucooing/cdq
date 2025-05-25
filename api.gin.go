@@ -114,24 +114,17 @@ func (a *GinApi) GetApi(c *gin.Context) {
 	resp.Msg = fmt.Sprintf("%s", msg)
 }
 
-func (a *GinApi) GenCommandOption(input any, command *Command) (map[string]*CommandOption, error) {
+func (a *GinApi) GenCommandOption(input any, command *Command) (map[string]string, error) {
 	c := input.(*gin.Context)
-	options := make(map[string]*CommandOption, 0)
+	options := make(map[string]string, 0)
 	for _, op := range command.Options {
 		part := c.Query(op.Name)
 		if op.Required {
 			if part == "" {
 				return nil, errors.New(fmt.Sprintf("缺少必要参数:%s", op.Name))
 			}
-		} else {
-			if part == "" {
-				continue
-			}
 		}
-		options[op.Name] = &CommandOption{
-			Name:   op.Name,
-			Option: part,
-		}
+		options[op.Name] = part
 	}
 
 	return options, nil

@@ -25,7 +25,7 @@ func NewShell(c *CDQ) *Shell {
 			AliasList:   []string{"exit"},
 			Description: "shell 内置指令,退出shell程序",
 			Options:     nil,
-			CommandFunc: func(options map[string]*CommandOption) (string, error) {
+			CommandFunc: func(options map[string]string) (string, error) {
 				s.Exit()
 				return "exit", nil
 			},
@@ -75,8 +75,8 @@ func (s *Shell) Run() {
 	}
 }
 
-func (s *Shell) GenCommandOption(input any, command *Command) (map[string]*CommandOption, error) {
-	options := make(map[string]*CommandOption, 0)
+func (s *Shell) GenCommandOption(input any, command *Command) (map[string]string, error) {
+	options := make(map[string]string, 0)
 	parts := strings.Fields(input.(string))
 	for index, op := range command.Options {
 		if op.Required && len(parts) < index+2 {
@@ -86,10 +86,7 @@ func (s *Shell) GenCommandOption(input any, command *Command) (map[string]*Comma
 			if len(parts) < index+2 {
 				return nil, errors.New(fmt.Sprintf("缺少必要参数:%s", op.Name))
 			}
-			options[op.Name] = &CommandOption{
-				Name:   op.Name,
-				Option: parts[index+1],
-			}
+			options[op.Name] = parts[index+1]
 		} else {
 			if len(parts) < index+2 {
 				continue
@@ -98,10 +95,7 @@ func (s *Shell) GenCommandOption(input any, command *Command) (map[string]*Comma
 			if len(ids) != 2 {
 				continue
 			}
-			options[ids[0]] = &CommandOption{
-				Name:   ids[0],
-				Option: ids[1],
-			}
+			options[ids[0]] = ids[1]
 		}
 	}
 
