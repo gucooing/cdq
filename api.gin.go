@@ -12,7 +12,7 @@ import (
 type GinApi struct {
 	c       *CDQ
 	Router  *gin.Engine
-	ApiKey  string
+	ApiKey  map[string]bool
 	server  *http.Server
 	ginSync *sync.Mutex
 }
@@ -21,6 +21,7 @@ func NewGinApi(c *CDQ, ginSync *sync.Mutex) *GinApi {
 	a := &GinApi{
 		c:       c,
 		ginSync: ginSync,
+		ApiKey:  make(map[string]bool),
 	}
 	if a.ginSync == nil {
 		a.ginSync = &sync.Mutex{}
@@ -47,8 +48,10 @@ func (a *GinApi) SetRouter(router *gin.Engine) {
 	a.Router.GET("/cdq/api", a.AutoGucooingApi, a.GetApi)
 }
 
-func (a *GinApi) SetApiKey(key string) {
-	a.ApiKey = key
+func (a *GinApi) SetApiKey(key ...string) {
+	for _, k := range key {
+		a.ApiKey[k] = true
+	}
 }
 
 func (a *GinApi) Run() {
@@ -131,8 +134,8 @@ func (a *GinApi) GenCommandOption(input any, command *Command) (map[string]strin
 }
 
 func (a *GinApi) AutoGucooingApi(c *gin.Context) {
-	if a.ApiKey == "" ||
-		c.GetHeader("Authorization") == a.ApiKey {
+	if len(a.ApiKey) == 0 ||
+		a.ApiKey[c.GetHeader("Authorization")] {
 		return
 	} else {
 		c.String(401, "Unauthorized")
