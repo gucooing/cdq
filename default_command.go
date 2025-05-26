@@ -11,7 +11,7 @@ func (c *CDQ) applicationCommandHelp() {
 		AliasList:   []string{"help", "h"},
 		Description: "有关某个命令的详细信息，请键入 help 命令名",
 		Permissions: Guest,
-		CommandFunc: c.help,
+		CommandFunc: c.Help,
 		Options: []*CommandOption{
 			{
 				Name:        "c",
@@ -22,7 +22,7 @@ func (c *CDQ) applicationCommandHelp() {
 	})
 }
 
-func (c *CDQ) help(options map[string]string) (string, error) {
+func (c *CDQ) Help(options map[string]string) (string, error) {
 	var returnstr string
 	if options["c"] == "" {
 		returnstr += "有关某个命令的详细信息，请键入 help c:命令名\n"
