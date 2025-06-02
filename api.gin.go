@@ -55,6 +55,7 @@ func (a *GinApi) NewRouter(addr string, debug bool) {
 func (a *GinApi) SetRouter(router *gin.Engine) {
 	a.Router = router
 	a.Router.GET("/cdq/api", a.AutoGucooingApi, a.GetApi)
+	a.Router.GET("/cdq/api/shell", a.AutoGucooingApi, a.shell)
 }
 
 func (a *GinApi) SetApiKey(key ...string) {
