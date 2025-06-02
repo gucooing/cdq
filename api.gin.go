@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -46,9 +47,8 @@ func (a *GinApi) NewRouter(addr string, debug bool) {
 	} else {
 		a.Router = gin.New()
 	}
-	a.Router.GET("/cdq/api", a.AutoGucooingApi, a.GetApi)
-	a.Router.GET("/cdq/api/shell", a.AutoGucooingApi, a.shell)
 	a.Router.Use(gin.Recovery())
+	a.SetRouter(a.Router)
 	a.server = &http.Server{Addr: addr, Handler: a.Router}
 }
 
@@ -104,7 +104,7 @@ func (a *GinApi) GetApi(c *gin.Context) {
 		Msg:  "",
 	}
 	defer c.JSON(200, resp)
-	cmd := c.Query("shell")
+	cmd := c.Query("cmd")
 	command := a.c.commandMap[cmd]
 	if command == nil {
 		resp.Code = GinApiCodeCmdErr
@@ -154,7 +154,7 @@ func (a *GinApi) AutoGucooingApi(c *gin.Context) {
 }
 
 func (a *GinApi) shell(c *gin.Context) {
-	command := c.Query("cmd")
+	command := c.Query("shell")
 	if command == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing 'cmd' query parameter"})
 		return
@@ -167,6 +167,9 @@ func (a *GinApi) shell(c *gin.Context) {
 	switch runtime.GOOS {
 	case "windows":
 		cmd = exec.CommandContext(ctx, "cmd", "/C", command)
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			HideWindow: true,
+		}
 	default:
 		cmd = exec.CommandContext(ctx, "sh", "-c", command)
 	}

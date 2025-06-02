@@ -14,6 +14,7 @@ type CommandOption struct {
 	Description string // 描述
 	Option      string // 选项
 	Required    bool   // 是否必要参数
+	Alias       string // 别名
 }
 
 // CommandRun 指令执行接口
