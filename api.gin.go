@@ -8,10 +8,8 @@ import (
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 	"net/http"
-	"os/exec"
 	"runtime"
 	"sync"
-	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -163,16 +161,7 @@ func (a *GinApi) shell(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "windows":
-		cmd = exec.CommandContext(ctx, "cmd", "/C", command)
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			HideWindow: true,
-		}
-	default:
-		cmd = exec.CommandContext(ctx, "sh", "-c", command)
-	}
+	cmd := newShellCmd(ctx, command)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
