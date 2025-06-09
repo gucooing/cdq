@@ -8,10 +8,10 @@ import (
 func (c *CDQ) applicationCommandHelp() {
 	c.ApplicationCommand(&Command{
 		Name:        "help",
-		AliasList:   []string{"help", "h"},
+		AliasList:   []string{"h"},
 		Description: "有关某个命令的详细信息，请键入 help 命令名",
 		Permissions: Guest,
-		CommandFunc: c.Help,
+		Handlers:    AddHandlers(c.Help),
 		Options: []*CommandOption{
 			{
 				Name:        "c",
@@ -22,10 +22,10 @@ func (c *CDQ) applicationCommandHelp() {
 	})
 }
 
-func (c *CDQ) Help(options map[string]string) (string, error) {
+func (c *CDQ) Help(ctx *Context) {
 	var returnstr string
-	if options["c"] == "" {
-		returnstr += "有关某个命令的详细信息，请键入 help c:命令名\n"
+	if commSrt := ctx.GetFlags().String("c"); commSrt == "" {
+		returnstr += "有关某个命令的详细信息，请键入 help -c 命令名\n"
 		for _, comm := range c.commandList {
 			returnstr += fmt.Sprintf(
 				"%s---别名:%s------%s\n",
@@ -35,26 +35,32 @@ func (c *CDQ) Help(options map[string]string) (string, error) {
 			)
 		}
 	} else {
-		comm, ok := c.commandMap[options["c"]]
+		comm, ok := c.commandMap[commSrt]
 		if !ok {
 			returnstr += "不支持此命令\n"
 		} else {
-			returnstr += comm.Description + "\n"
-			returnstr += fmt.Sprintf("别名:%s\n", comm.AliasList)
+			returnstr += fmt.Sprintf("命令:%s 描述:%s 别名:%s", comm.Name, comm.Description, comm.AliasList)
 			example := comm.Name
 			var opt string
-			for _, option := range comm.Options {
-				if !option.Required {
-					example += fmt.Sprintf(" [%s:msg]", option.Name)
+			for _, op := range comm.Options {
+				example += fmt.Sprintf(" -%s msg", op.Name)
+				opt += fmt.Sprintf("      %s - 描述:%s -别名:%s", op.Name, op.Description, op.Alias)
+				if op.Required {
+					opt += " -必要参数"
 				} else {
-					example += fmt.Sprintf(" %s", option.Name)
+					opt += " -非必要参数"
 				}
-				opt += fmt.Sprintf("      %s - %s\n", option.Name, option.Description)
+				if op.Default != "" {
+					opt += fmt.Sprintf(" -默认值:%s", op.Default)
+				}
+				if len(op.ExpectedS) > 0 {
+					opt += fmt.Sprintf(" -可选参数:%s", op.ExpectedS)
+				}
+				opt += "\n"
 			}
 			returnstr += fmt.Sprintf("\n%s", example)
-			returnstr += fmt.Sprintf("\n%s", opt)
+			returnstr += fmt.Sprintf("\n%s\n", opt)
 		}
 	}
-
-	return returnstr, nil
+	ctx.Return(0, returnstr)
 }

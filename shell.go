@@ -22,13 +22,12 @@ func NewShell(c *CDQ) *Shell {
 	c.ApplicationCommand(
 		&Command{
 			Name:        "exit",
-			AliasList:   []string{"exit"},
+			AliasList:   []string{"quit"},
 			Description: "shell 内置指令,退出shell程序",
 			Options:     nil,
-			CommandFunc: func(options map[string]string) (string, error) {
+			Handlers: AddHandlers(func(c *Context) {
 				s.Exit()
-				return "exit", nil
-			},
+			}),
 		})
 	return s
 }
@@ -55,49 +54,63 @@ func (s *Shell) Run() {
 		if len(parts) == 0 {
 			continue
 		}
+		c := &ShellContext{
+			s: s,
+		}
 		command := s.c.commandMap[parts[0]]
 		if command == nil {
-			s.c.Log.Error("不存在命令:%s", parts[0])
+			c.Return(ApiCodeCmdUnknown, fmt.Sprintf("不存在命令:%s", parts[0]))
 			continue
 		}
 		// 附加参数解析
-		options, err := s.GenCommandOption(input, command)
+		ctxs, err := s.GenCommandOption(parts[1:], command)
 		if err != nil {
-			s.c.Log.Error(err.Error())
+			c.Return(ApiCodeOptionUnknown, err.Error())
 			continue
 		}
-		msg, err := command.CommandFunc(options)
-		if err != nil {
-			s.c.Log.Error("执行指令:%s 失败,错误%s", command.Name, err.Error())
-			continue
-		}
-		s.c.Log.Info("执行指令:%s 成功,%s", command.Name, msg)
+		c.Context = ctxs
+		ctxs.writ = c
+		ctxs.Next()
 	}
 }
 
-func (s *Shell) GenCommandOption(input any, command *Command) (map[string]string, error) {
+type ShellContext struct {
+	*Context
+	s *Shell
+}
+
+func (s *Shell) GenCommandOption(args any, command *Command) (*Context, error) {
 	options := make(map[string]string, 0)
-	parts := strings.Fields(input.(string))
-	for index, op := range command.Options {
-		if op.Required && len(parts) < index+2 {
-			return nil, errors.New(fmt.Sprintf("缺少必要参数:%s", op.Name))
-		}
-		if op.Required {
-			if len(parts) < index+2 {
-				return nil, errors.New(fmt.Sprintf("缺少必要参数:%s", op.Name))
-			}
-			options[op.Name] = parts[index+1]
-		} else {
-			if len(parts) < index+2 {
-				continue
-			}
-			ids := strings.Split(parts[index+1], ":")
-			if len(ids) != 2 {
-				continue
-			}
-			options[ids[0]] = ids[1]
+	parts := args.([]string)
+	flags := make(FlagMap)
+	for i := 0; i < len(parts)/2; i++ {
+		index := i * 2
+		switch string(parts[index][0]) {
+		case "-":
+			options[parts[index][1:]] = parts[index+1]
+		default:
+			options[parts[index]] = parts[index+1]
 		}
 	}
+	for _, op := range command.Options {
+		v := orString(options[op.Alias], options[op.Name])
+		if v == "" && op.Required {
+			return nil, errors.New(fmt.Sprintf("缺少必要参数:%s", op.Name))
+		}
+		fi, err := op.genFlagMapItem(op.Alias, v)
+		if err != nil {
+			return nil, err
+		}
+		flags[op.Name] = fi
+	}
 
-	return options, nil
+	return newContext(s, command, flags), nil
+}
+
+func (s *ShellContext) Return(code int, msg string) {
+	if code != ApiCodeOk {
+		s.s.c.Log.Debug(msg)
+	} else {
+		s.s.c.Log.Info(msg)
+	}
 }

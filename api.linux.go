@@ -3,10 +3,10 @@
 package cdq
 
 import (
-	"context"
+	ctx "context"
 	"os/exec"
 )
 
-func newShellCmd(ctx context.Context, command string) *exec.Cmd {
+func newShellCmd(ctx ctx.Context, command string) *exec.Cmd {
 	return exec.CommandContext(ctx, "sh", "-c", command)
 }

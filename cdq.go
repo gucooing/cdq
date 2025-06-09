@@ -44,12 +44,22 @@ func (c *CDQ) ApplicationCommand(command *Command) {
 		c.commandList = make([]*Command, 0)
 	}
 	c.commandList = append(c.commandList, command)
-	for _, name := range command.AliasList {
+	addName := func(name string) {
 		if _, ok := c.commandMap[name]; ok {
 			c.Log.Error("指令:%s ,别名:%s 重复注册", command.Name, name)
-			continue
+			return
 		}
 		c.commandMap[name] = command
+	}
+	addName(command.Name)
+	for _, name := range command.AliasList {
+		addName(name)
+	}
+	for _, op := range command.Options {
+		op.expected = make(map[string]bool)
+		for _, x := range op.ExpectedS {
+			op.expected[x] = true
+		}
 	}
 
 	c.Log.Debug("注册指令名称:%s,别名:%s,描述:%s", command.Name, command.AliasList, command.Description)

@@ -1,7 +1,7 @@
 package cdq
 
 import (
-	"context"
+	ctx "context"
 	"errors"
 	"fmt"
 	"golang.org/x/text/encoding"
@@ -9,7 +9,6 @@ import (
 	"golang.org/x/text/transform"
 	"net/http"
 	"runtime"
-	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -17,21 +16,16 @@ import (
 )
 
 type GinApi struct {
-	c       *CDQ
-	Router  *gin.Engine
-	ApiKey  map[string]bool
-	server  *http.Server
-	ginSync *sync.Mutex
+	c      *CDQ
+	Router *gin.Engine
+	ApiKey map[string]bool
+	server *http.Server
 }
 
-func NewGinApi(c *CDQ, ginSync *sync.Mutex) *GinApi {
+func NewGinApi(c *CDQ) *GinApi {
 	a := &GinApi{
-		c:       c,
-		ginSync: ginSync,
-		ApiKey:  make(map[string]bool),
-	}
-	if a.ginSync == nil {
-		a.ginSync = &sync.Mutex{}
+		c:      c,
+		ApiKey: make(map[string]bool),
 	}
 
 	c.Log.Debug("启用GinApi指令")
@@ -53,6 +47,7 @@ func (a *GinApi) NewRouter(addr string, debug bool) {
 func (a *GinApi) SetRouter(router *gin.Engine) {
 	a.Router = router
 	a.Router.GET("/cdq/api", a.AutoGucooingApi, a.GetApi)
+	a.Router.GET("/cdq/api/help", a.AutoGucooingApi, a.Help)
 	a.Router.GET("/cdq/api/shell", a.AutoGucooingApi, a.shell)
 }
 
@@ -88,57 +83,61 @@ type GinApiResponse struct {
 type GinApiCode = int
 
 const (
-	GinApiCodeOk        GinApiCode = iota
-	GinApiCodeCmdErr               // 不存在该指令
-	GinApiCodeOptionErr            // 参数错误
-	GinApiCodeErr                  // 其他错误,详情看msg
+	ApiCodeOk            GinApiCode = iota
+	ApiCodeCmdUnknown               // 不存在该指令
+	ApiCodeOptionUnknown            // 参数错误
+	GinApiCodeErr                   // 其他错误,详情看msg
 )
 
-func (a *GinApi) GetApi(c *gin.Context) {
-	a.ginSync.Lock()
-	defer a.ginSync.Unlock()
-	resp := &GinApiResponse{
-		Code: GinApiCodeOk,
-		Msg:  "",
+func (a *GinApi) GetApi(ginc *gin.Context) {
+	c := &GinApiContext{
+		c: ginc,
 	}
-	defer c.JSON(200, resp)
-	cmd := c.Query("cmd")
+	cmd := ginc.Query("cmd")
 	command := a.c.commandMap[cmd]
 	if command == nil {
-		resp.Code = GinApiCodeCmdErr
-		resp.Msg = fmt.Sprintf("不存在命令:%s", cmd)
+		c.Return(ApiCodeCmdUnknown, fmt.Sprintf("不存在命令:%s", cmd))
 		return
 	}
 	// 附加参数解析
-	options, err := a.GenCommandOption(c, command)
+	ctxs, err := a.GenCommandOption(ginc, command)
 	if err != nil {
-		resp.Code = GinApiCodeOptionErr
-		resp.Msg = err.Error()
+		c.Return(ApiCodeOptionUnknown, err.Error())
 		return
 	}
-	msg, err := command.CommandFunc(options)
-	if err != nil {
-		resp.Code = GinApiCodeErr
-		resp.Msg = err.Error()
-		return
-	}
-	resp.Msg = fmt.Sprintf("%s", msg)
+	c.Context = ctxs
+	ctxs.writ = c
+	ctxs.Next()
 }
 
-func (a *GinApi) GenCommandOption(input any, command *Command) (map[string]string, error) {
-	c := input.(*gin.Context)
-	options := make(map[string]string, 0)
+type GinApiContext struct {
+	*Context
+	c *gin.Context
+}
+
+func (a *GinApi) GenCommandOption(input any, command *Command) (*Context, error) {
+	ginc := input.(*gin.Context)
+	flags := make(FlagMap)
 	for _, op := range command.Options {
-		part := c.Query(op.Name)
-		if op.Required {
-			if part == "" {
-				return nil, errors.New(fmt.Sprintf("缺少必要参数:%s", op.Name))
-			}
+		v := orString(ginc.Query(op.Name), ginc.Query(op.Alias))
+		if v == "" && op.Required {
+			return nil, errors.New(fmt.Sprintf("缺少必要参数:%s", op.Name))
 		}
-		options[op.Name] = part
+		fi, err := op.genFlagMapItem(op.Alias, v)
+		if err != nil {
+			return nil, err
+		}
+		flags[op.Name] = fi
 	}
 
-	return options, nil
+	return newContext(a, command, flags), nil
+}
+
+func (c *GinApiContext) Return(code int, msg string) {
+	c.c.JSON(code, gin.H{
+		"code": code,
+		"msg":  msg,
+	})
 }
 
 func (a *GinApi) AutoGucooingApi(c *gin.Context) {
@@ -151,6 +150,35 @@ func (a *GinApi) AutoGucooingApi(c *gin.Context) {
 	}
 }
 
+func (a *GinApi) Help(c *gin.Context) {
+	var returnstr string
+	for _, comm := range a.c.commandList {
+		returnstr += "----------------------------------\n"
+		returnstr += fmt.Sprintf("命令:%s 描述:%s 别名:%s", comm.Name, comm.Description, comm.AliasList)
+		example := fmt.Sprintf("用法:/cdq/api?cmd=%s", comm.Name)
+		var opt string
+		for _, op := range comm.Options {
+			example += fmt.Sprintf("&%s=msg", op.Name)
+			opt += fmt.Sprintf("      %s - 描述:%s -别名:%s", op.Name, op.Description, op.Alias)
+			if op.Required {
+				opt += " -必要参数"
+			} else {
+				opt += " -非必要参数"
+			}
+			if op.Default != "" {
+				opt += fmt.Sprintf(" -默认值:%s", op.Default)
+			}
+			if len(op.ExpectedS) > 0 {
+				opt += fmt.Sprintf(" -可选参数:%s", op.ExpectedS)
+			}
+			opt += "\n"
+		}
+		returnstr += fmt.Sprintf("\n%s", example)
+		returnstr += fmt.Sprintf("\n%s\n", opt)
+	}
+	c.String(200, returnstr)
+}
+
 func (a *GinApi) shell(c *gin.Context) {
 	command := c.Query("shell")
 	if command == "" {
@@ -158,10 +186,10 @@ func (a *GinApi) shell(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctxs, cancel := ctx.WithTimeout(ctx.Background(), 10*time.Second)
 	defer cancel()
 
-	cmd := newShellCmd(ctx, command)
+	cmd := newShellCmd(ctxs, command)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
