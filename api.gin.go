@@ -134,7 +134,7 @@ func (a *GinApi) GenCommandOption(input any, command *Command) (*Context, error)
 }
 
 func (c *GinApiContext) Return(code int, msg string) {
-	c.c.JSON(code, gin.H{
+	c.c.JSON(http.StatusOK, gin.H{
 		"code": code,
 		"msg":  msg,
 	})
