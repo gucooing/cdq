@@ -2,6 +2,7 @@ package cdq
 
 import (
 	ctx "context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -88,7 +89,7 @@ const (
 	ApiCodeOk            GinApiCode = iota
 	ApiCodeCmdUnknown               // 不存在该指令
 	ApiCodeOptionUnknown            // 参数错误
-	GinApiCodeErr                   // 其他错误,详情看msg
+	ApiCodeMarshalErr               // 执行完成但是编码响应失败,将失败提交给开发者
 )
 
 func (a *GinApi) GetApi(ginc *gin.Context) {
@@ -135,12 +136,21 @@ func (a *GinApi) GenCommandOption(input any, command *Command) (*Context, error)
 	return newContext(a, command, flags), nil
 }
 
-func (c *GinApiContext) Return(code int, message string, data any) {
-	c.c.JSON(http.StatusOK, &GinApiResponse{
+func (c *GinApiContext) Return(code int, message string, data interface{}) {
+	rsp := &GinApiResponse{
 		Code:    code,
 		Message: message,
-		Data:    data,
-	})
+	}
+	if data != nil {
+		str, err := json.Marshal(data)
+		if err != nil {
+			rsp.Code = ApiCodeMarshalErr
+			rsp.Message = fmt.Sprintf("msg：%s\nerr:%s", message, err.Error())
+		} else {
+			rsp.Data = string(str)
+		}
+	}
+	c.c.JSON(http.StatusOK, rsp)
 }
 
 func (a *GinApi) AutoGucooingApi(c *gin.Context) {

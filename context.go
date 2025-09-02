@@ -37,7 +37,7 @@ func (c *Context) Abort() {
 	c.index = abortIndex
 }
 
-func (c *Context) Return(code int, message string, data any) {
+func (c *Context) Return(code int, message string, data interface{}) {
 	c.writ.Return(code, message, data)
 }
 

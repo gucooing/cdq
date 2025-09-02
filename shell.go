@@ -107,7 +107,7 @@ func (s *Shell) GenCommandOption(args any, command *Command) (*Context, error) {
 	return newContext(s, command, flags), nil
 }
 
-func (s *ShellContext) Return(code int, message string, data any) {
+func (s *ShellContext) Return(code int, message string, data interface{}) {
 	if code != ApiCodeOk {
 		s.s.c.Log.Debug(message)
 	} else {
