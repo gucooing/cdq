@@ -59,13 +59,13 @@ func (s *Shell) Run() {
 		}
 		command := s.c.commandMap[parts[0]]
 		if command == nil {
-			c.Return(ApiCodeCmdUnknown, fmt.Sprintf("不存在命令:%s", parts[0]))
+			c.Return(ApiCodeCmdUnknown, fmt.Sprintf("不存在命令:%s", parts[0]), nil)
 			continue
 		}
 		// 附加参数解析
 		ctxs, err := s.GenCommandOption(parts[1:], command)
 		if err != nil {
-			c.Return(ApiCodeOptionUnknown, err.Error())
+			c.Return(ApiCodeOptionUnknown, err.Error(), nil)
 			continue
 		}
 		c.Context = ctxs
@@ -107,10 +107,10 @@ func (s *Shell) GenCommandOption(args any, command *Command) (*Context, error) {
 	return newContext(s, command, flags), nil
 }
 
-func (s *ShellContext) Return(code int, msg string) {
+func (s *ShellContext) Return(code int, message string, data any) {
 	if code != ApiCodeOk {
-		s.s.c.Log.Debug(msg)
+		s.s.c.Log.Debug(message)
 	} else {
-		s.s.c.Log.Info(msg)
+		s.s.c.Log.Info(message)
 	}
 }

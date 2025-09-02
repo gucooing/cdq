@@ -4,13 +4,14 @@ import (
 	ctx "context"
 	"errors"
 	"fmt"
-	"golang.org/x/text/encoding"
-	"golang.org/x/text/encoding/simplifiedchinese"
-	"golang.org/x/text/transform"
 	"net/http"
 	"runtime"
 	"time"
 	"unicode/utf8"
+
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,14 +19,14 @@ import (
 type GinApi struct {
 	c      *CDQ
 	Router *gin.Engine
-	ApiKey map[string]bool
+	ApiKey map[string]struct{}
 	server *http.Server
 }
 
 func NewGinApi(c *CDQ) *GinApi {
 	a := &GinApi{
 		c:      c,
-		ApiKey: make(map[string]bool),
+		ApiKey: make(map[string]struct{}),
 	}
 
 	c.Log.Debug("启用GinApi指令")
@@ -53,7 +54,7 @@ func (a *GinApi) SetRouter(router *gin.Engine) {
 
 func (a *GinApi) SetApiKey(key ...string) {
 	for _, k := range key {
-		a.ApiKey[k] = true
+		a.ApiKey[k] = struct{}{}
 	}
 }
 
@@ -76,8 +77,9 @@ func (a *GinApi) Exit() {
 }
 
 type GinApiResponse struct {
-	Code GinApiCode `json:"code"`
-	Msg  string     `json:"msg"`
+	Code    GinApiCode `json:"code"`
+	Message string     `json:"message"`
+	Data    any        `json:"data"`
 }
 
 type GinApiCode = int
@@ -96,13 +98,13 @@ func (a *GinApi) GetApi(ginc *gin.Context) {
 	cmd := ginc.Query("cmd")
 	command := a.c.commandMap[cmd]
 	if command == nil {
-		c.Return(ApiCodeCmdUnknown, fmt.Sprintf("不存在命令:%s", cmd))
+		c.Return(ApiCodeCmdUnknown, fmt.Sprintf("未知命令:%s", cmd), nil)
 		return
 	}
 	// 附加参数解析
 	ctxs, err := a.GenCommandOption(ginc, command)
 	if err != nil {
-		c.Return(ApiCodeOptionUnknown, err.Error())
+		c.Return(ApiCodeOptionUnknown, err.Error(), nil)
 		return
 	}
 	c.Context = ctxs
@@ -133,16 +135,17 @@ func (a *GinApi) GenCommandOption(input any, command *Command) (*Context, error)
 	return newContext(a, command, flags), nil
 }
 
-func (c *GinApiContext) Return(code int, msg string) {
-	c.c.JSON(http.StatusOK, gin.H{
-		"code": code,
-		"msg":  msg,
+func (c *GinApiContext) Return(code int, message string, data any) {
+	c.c.JSON(http.StatusOK, &GinApiResponse{
+		Code:    code,
+		Message: message,
+		Data:    data,
 	})
 }
 
 func (a *GinApi) AutoGucooingApi(c *gin.Context) {
-	if len(a.ApiKey) == 0 ||
-		a.ApiKey[c.GetHeader("Authorization")] {
+	if _, ok := a.ApiKey[c.GetHeader("Authorization")]; ok ||
+		len(a.ApiKey) == 0 {
 		return
 	} else {
 		c.String(401, "Unauthorized")
@@ -153,9 +156,9 @@ func (a *GinApi) AutoGucooingApi(c *gin.Context) {
 func (a *GinApi) Help(c *gin.Context) {
 	var returnstr string
 	for _, comm := range a.c.commandList {
-		returnstr += "----------------------------------\n"
+		returnstr += "\n----------------------------------"
 		returnstr += fmt.Sprintf("命令:%s 描述:%s 别名:%s", comm.Name, comm.Description, comm.AliasList)
-		example := fmt.Sprintf("用法:/cdq/api?cmd=%s", comm.Name)
+		example := fmt.Sprintf("用法: GET /cdq/api?cmd=%s", comm.Name)
 		var opt string
 		for _, op := range comm.Options {
 			example += fmt.Sprintf("&%s=msg", op.Name)
@@ -173,8 +176,8 @@ func (a *GinApi) Help(c *gin.Context) {
 			}
 			opt += "\n"
 		}
-		returnstr += fmt.Sprintf("\n%s", example)
-		returnstr += fmt.Sprintf("\n%s\n", opt)
+		returnstr += fmt.Sprintf("\n%s\n", example)
+		returnstr += fmt.Sprintf("%s\n\n", opt)
 	}
 	c.String(200, returnstr)
 }

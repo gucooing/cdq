@@ -25,10 +25,10 @@ func (c *CDQ) applicationCommandHelp() {
 func (c *CDQ) Help(ctx *Context) {
 	var returnstr string
 	if commSrt := ctx.GetFlags().String("c"); commSrt == "" {
-		returnstr += "有关某个命令的详细信息，请键入 help -c 命令名\n"
+		returnstr += "有关某个命令的详细信息，请键入 help -c 命令名\n\n"
 		for _, comm := range c.commandList {
 			returnstr += fmt.Sprintf(
-				"%s---别名:%s------%s\n",
+				"%s---别名:%s------%s\n\n",
 				comm.Name,
 				comm.AliasList,
 				comm.Description,
@@ -62,5 +62,5 @@ func (c *CDQ) Help(ctx *Context) {
 			returnstr += fmt.Sprintf("\n%s\n", opt)
 		}
 	}
-	ctx.Return(0, returnstr)
+	ctx.Return(0, returnstr, nil)
 }

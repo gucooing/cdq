@@ -11,7 +11,7 @@ type Context struct {
 	handlers Handlers   // 执行函数
 	index    int8
 	writ     interface {
-		Return(code int, msg string)
+		Return(code int, message string, data any)
 	}
 }
 
@@ -37,8 +37,8 @@ func (c *Context) Abort() {
 	c.index = abortIndex
 }
 
-func (c *Context) Return(code int, msg string) {
-	c.writ.Return(code, msg)
+func (c *Context) Return(code int, message string, data any) {
+	c.writ.Return(code, message, data)
 }
 
 func (c *Context) GetFlags() FlagMap {
